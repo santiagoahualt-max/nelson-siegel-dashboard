@@ -1,0 +1,893 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nelson-Siegel & Z-Score Dashboard</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Chart.js Datalabels Plugin -->
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0"></script>
+    <style>
+        :root {
+            --bg-color: #0b0f19;
+            --card-bg: rgba(17, 24, 39, 0.7);
+            --border-color: rgba(255, 255, 255, 0.08);
+            --text-primary: #f3f4f6;
+            --text-secondary: #9ca3af;
+            --primary: #3b82f6;
+            --primary-glow: rgba(59, 130, 246, 0.3);
+            --buy-color: #10b981;
+            --buy-bg: rgba(16, 185, 129, 0.15);
+            --sell-color: #ef4444;
+            --sell-bg: rgba(239, 68, 68, 0.15);
+            --neutral-color: #94a3b8;
+            --neutral-bg: rgba(148, 163, 184, 0.1);
+            --font-outfit: 'Outfit', sans-serif;
+            --font-inter: 'Inter', sans-serif;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            font-family: var(--font-inter);
+            min-height: 100vh;
+            padding: 2rem;
+            background-image: 
+                radial-gradient(circle at 10% 20%, rgba(59, 130, 246, 0.05) 0%, transparent 40%),
+                radial-gradient(circle at 90% 80%, rgba(16, 185, 129, 0.04) 0%, transparent 40%);
+            background-attachment: fixed;
+        }
+
+        header {
+            margin-bottom: 2rem;
+            text-align: center;
+        }
+
+        h1 {
+            font-family: var(--font-outfit);
+            font-size: 2.5rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, #60a5fa 0%, #34d399 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 0.5rem;
+            letter-spacing: -0.5px;
+        }
+
+        header p {
+            color: var(--text-secondary);
+            font-size: 1.1rem;
+        }
+
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: 350px 1fr;
+            gap: 2rem;
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+
+        @media (max-width: 1100px) {
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 1.5rem;
+            backdrop-filter: blur(12px);
+            box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
+            display: flex;
+            flex-direction: column;
+            gap: 1.2rem;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .card:hover {
+            box-shadow: 0 10px 40px -10px rgba(59, 130, 246, 0.1);
+        }
+
+        .card-title {
+            font-family: var(--font-outfit);
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 0.75rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        textarea {
+            width: 100%;
+            height: 300px;
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 1rem;
+            color: #ffffff;
+            font-family: monospace;
+            font-size: 0.85rem;
+            resize: none;
+            outline: none;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+
+        textarea:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px var(--primary-glow);
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+            border: none;
+            color: #ffffff;
+            font-family: var(--font-outfit);
+            font-weight: 600;
+            font-size: 1rem;
+            padding: 0.85rem;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: transform 0.1s, opacity 0.2s, box-shadow 0.2s;
+            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2);
+            text-align: center;
+        }
+
+        .btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 16px rgba(37, 99, 235, 0.4);
+        }
+
+        .btn:active {
+            transform: translateY(1px);
+        }
+
+        .btn-loading {
+            opacity: 0.7;
+            pointer-events: none;
+        }
+
+        /* Stats / Parameter list */
+        .params-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+        }
+
+        .param-card {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 0.75rem;
+            text-align: center;
+        }
+
+        .param-value {
+            font-family: var(--font-outfit);
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: var(--primary);
+            margin-top: 0.25rem;
+        }
+
+        .param-label {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        /* Main output panel */
+        .right-column {
+            display: flex;
+            flex-direction: column;
+            gap: 2rem;
+        }
+
+        .chart-container {
+            position: relative;
+            width: 100%;
+            height: 400px;
+        }
+
+        /* Table design */
+        .table-controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .search-input {
+            background: rgba(0, 0, 0, 0.2);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 0.5rem 1rem;
+            color: #ffffff;
+            outline: none;
+            font-size: 0.9rem;
+            width: 250px;
+            transition: border-color 0.2s;
+        }
+
+        .search-input:focus {
+            border-color: var(--primary);
+        }
+
+        .table-wrapper {
+            width: 100%;
+            overflow-x: auto;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+            font-size: 0.9rem;
+        }
+
+        th {
+            background: rgba(255, 255, 255, 0.02);
+            font-family: var(--font-outfit);
+            font-weight: 600;
+            padding: 0.85rem 1rem;
+            border-bottom: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            cursor: pointer;
+            user-select: none;
+            transition: background-color 0.2s;
+        }
+
+        th:hover {
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--text-primary);
+        }
+
+        th.sort-asc::after {
+            content: " ▲";
+            font-size: 0.7rem;
+        }
+
+        th.sort-desc::after {
+            content: " ▼";
+            font-size: 0.7rem;
+        }
+
+        td {
+            padding: 0.85rem 1rem;
+            border-bottom: 1px solid var(--border-color);
+            color: var(--text-primary);
+            transition: background-color 0.15s;
+        }
+
+        tr {
+            cursor: pointer;
+        }
+
+        tr:hover td {
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        /* Signal Pills */
+        .pill {
+            display: inline-block;
+            padding: 0.25rem 0.6rem;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-align: center;
+        }
+
+        .pill-buy {
+            color: var(--buy-color);
+            background: var(--buy-bg);
+        }
+
+        .pill-sell {
+            color: var(--sell-color);
+            background: var(--sell-bg);
+        }
+
+        .pill-neutral {
+            color: var(--neutral-color);
+            background: var(--neutral-bg);
+        }
+
+        /* Extra Details row */
+        .details-row td {
+            background: rgba(0, 0, 0, 0.2);
+            padding: 1rem 1.5rem;
+        }
+
+        .details-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 1rem;
+        }
+
+        .details-item {
+            font-size: 0.8rem;
+        }
+
+        .details-label {
+            color: var(--text-secondary);
+            margin-bottom: 0.25rem;
+        }
+
+        .details-val {
+            font-weight: 500;
+        }
+
+        /* Alerts / Messages */
+        .alert {
+            padding: 1rem;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            border: 1px solid transparent;
+            margin-bottom: 1rem;
+            display: none;
+        }
+
+        .alert-error {
+            background: var(--sell-bg);
+            border-color: rgba(239, 68, 68, 0.3);
+            color: #f87171;
+        }
+
+        .placeholder-text {
+            color: var(--text-secondary);
+            text-align: center;
+            padding: 4rem 1rem;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>Nelson-Siegel Curve & Z-Score Relative Value</h1>
+        <p>Dashboard Interactivo para Análisis Arbitraje de Bonos</p>
+    </header>
+
+    <div class="dashboard-grid">
+        <!-- Left Panel: Input & Calibration -->
+        <div style="display: flex; flex-direction: column; gap: 2rem;">
+            <div class="card">
+                <div class="card-title">Copiar & Pegar Datos</div>
+                <div style="font-size: 0.85rem; color: var(--text-secondary);">
+                    Pega tus columnas de Excel directamente en el cuadro de abajo. Asegúrate de incluir los encabezados correspondientes (Bono, MDuration, TIR).
+                </div>
+                <textarea id="dataInput" placeholder="Empresa	Bono	Vencimiento	Precio	TIR	MDuration...&#10;PLUSPETROL	PLC4O	30/5/2032	$108,70	6,83%	4,49...&#10;PLUSPETROL	PLC5O	18/5/2031	$107,60	6,62%	3,86..."></textarea>
+                <div id="errorAlert" class="alert alert-error"></div>
+                <button id="calcBtn" class="btn">Calcular Parámetros & Z-Score</button>
+            </div>
+
+            <!-- Parameters Card -->
+            <div class="card" id="paramsCard" style="display: none;">
+                <div class="card-title">Curva Calibrada</div>
+                <div class="params-grid">
+                    <div class="param-card">
+                        <div class="param-label">Beta 0 (Nivel)</div>
+                        <div class="param-value" id="valBeta0">-</div>
+                    </div>
+                    <div class="param-card">
+                        <div class="param-label">Beta 1 (Pendiente)</div>
+                        <div class="param-value" id="valBeta1">-</div>
+                    </div>
+                    <div class="param-card">
+                        <div class="param-label">Beta 2 (Curvatura)</div>
+                        <div class="param-value" id="valBeta2">-</div>
+                    </div>
+                    <div class="param-card">
+                        <div class="param-label">Lambda (Decaimiento)</div>
+                        <div class="param-value" id="valLambda">-</div>
+                    </div>
+                </div>
+                <div style="text-align: center; font-size: 0.85rem; color: var(--text-secondary); border-top: 1px solid var(--border-color); padding-top: 0.75rem;">
+                    Ajuste RMSE: <strong id="valRmse" style="color: var(--text-primary);">-</strong>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Panel: Chart & Results Table -->
+        <div class="right-column">
+            <!-- Chart Card -->
+            <div class="card">
+                <div class="card-title">Curva Nelson-Siegel Ajustada</div>
+                <!-- Axis Controls -->
+                <div id="chartControls" style="display: none; flex-wrap: wrap; gap: 1rem; align-items: center; background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); padding: 0.75rem 1rem; border-radius: 8px; font-size: 0.85rem; margin-bottom: 0.5rem;">
+                    <label style="display: flex; align-items: center; gap: 0.4rem; cursor: pointer; user-select: none; font-weight: 500;">
+                        <input type="checkbox" id="zoomBondsCheck" checked style="cursor: pointer; width: 15px; height: 15px;">
+                        Acotar a Duración de Bonos
+                    </label>
+                    <div style="display: flex; align-items: center; gap: 0.4rem; border-left: 1px solid var(--border-color); padding-left: 1rem;">
+                        <span style="color: var(--text-secondary);">Eje X (Duración):</span>
+                        <input type="number" id="xMinInput" placeholder="Min" style="width: 55px; background: rgba(0,0,0,0.3); border: 1px solid var(--border-color); border-radius: 4px; padding: 2px 5px; color: #fff; text-align: center; outline: none;" step="0.5">
+                        <span>a</span>
+                        <input type="number" id="xMaxInput" placeholder="Max" style="width: 55px; background: rgba(0,0,0,0.3); border: 1px solid var(--border-color); border-radius: 4px; padding: 2px 5px; color: #fff; text-align: center; outline: none;" step="0.5">
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 0.4rem; border-left: 1px solid var(--border-color); padding-left: 1rem;">
+                        <span style="color: var(--text-secondary);">Eje Y (TIR %):</span>
+                        <input type="number" id="yMinInput" placeholder="Min" style="width: 55px; background: rgba(0,0,0,0.3); border: 1px solid var(--border-color); border-radius: 4px; padding: 2px 5px; color: #fff; text-align: center; outline: none;" step="0.5">
+                        <span>a</span>
+                        <input type="number" id="yMaxInput" placeholder="Max" style="width: 55px; background: rgba(0,0,0,0.3); border: 1px solid var(--border-color); border-radius: 4px; padding: 2px 5px; color: #fff; text-align: center; outline: none;" step="0.5">
+                    </div>
+                    <button id="applyAxisBtn" class="btn" style="padding: 0.25rem 0.75rem; font-size: 0.8rem; margin-left: auto;">Aplicar Ejes</button>
+                </div>
+                <div id="chartPlaceholder" class="placeholder-text">
+                    Carga datos y presiona calcular para visualizar el gráfico.
+                </div>
+                <div id="chartWrapper" class="chart-container" style="display: none;">
+                    <canvas id="yieldChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Table Card -->
+            <div class="card">
+                <div class="card-title">Señales Arbitraje & Valuaciones</div>
+                <div id="tablePlaceholder" class="placeholder-text">
+                    Carga datos y presiona calcular para ver el análisis de activos.
+                </div>
+                
+                <div id="tableContainer" style="display: none;">
+                    <div class="table-controls">
+                        <input type="text" id="searchInput" class="search-input" placeholder="Buscar Bono / Emisor...">
+                        <div style="font-size: 0.85rem; color: var(--text-secondary);" id="bondCount"></div>
+                    </div>
+                    <div class="table-wrapper">
+                        <table id="bondsTable">
+                            <thead>
+                                <tr>
+                                    <th data-key="ticker">Bono</th>
+                                    <th data-key="duration">MDuration (τ)</th>
+                                    <th data-key="yield">TIR Real</th>
+                                    <th data-key="fitted">TIR Teórica</th>
+                                    <th data-key="residual_bps">Residuo (bps)</th>
+                                    <th data-key="z_score">Z-Score</th>
+                                    <th data-key="signal">Señal</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let chartInstance = null;
+        let bondsData = [];
+        let sortKey = 'z_score';
+        let sortDirection = 'desc';
+        let expandedRows = new Set();
+
+        // Sample data matching screenshot to initialize text area
+        const sampleData = `Empresa\tBono\tVencimiento\tAño\tPrecio\tTIR\tDuration\tMDuration\tDV01\tCapital\tIntCorr\tValorTécnico\tParidad\tCupón\tLegislación\tMoneda
+PLUSPETROL\tPLC4O\t30/5/2032\t2032\t$108,70\t6,83%\t4,80\t4,49\t0,049\t100,00\t0,75\t100,75\t107,89%\t8,500%\tNY\tCCL
+PLUSPETROL\tPLC5O\t18/5/2031\t2031\t$107,60\t6,62%\t4,12\t3,86\t0,042\t100,00\t0,99\t100,99\t106,54%\t8,125%\tNY\tCCL
+YPF\tYMCXO\t11/9/2031\t2031\t$114,00\t5,97%\t3,83\t3,61\t0,041\t100,00\t2,69\t102,69\t111,02%\t8,750%\tNY\tCCL
+YPF\tYM340\t17/1/2034\t2034\t$112,65\t6,55%\t5,15\t4,83\t0,054\t100,00\t3,73\t103,73\t108,60%\t8,250%\tNY\tCCL
+YPF\tYM390\t22/7/2030\t2030\t$114,05\t5,97%\t3,41\t3,22\t0,037\t100,00\t3,86\t103,86\t109,81%\t8,750%\tARG\tCCL
+TGS\tTSC3O\t24/7/2031\t2031\t$113,50\t6,31%\t4,13\t3,88\t0,044\t100,00\t3,73\t103,73\t109,42%\t8,500%\tNY\tCCL
+VISTA\tVSCVO\t10/6/2033\t2033\t$110,85\t6,47%\t4,83\t4,54\t0,050\t100,00\t0,51\t100,51\t110,29%\t8,500%\tNY\tCCL
+PAMPA\tMGCRO\t14/11/2037\t2037\t$106,70\t7,13%\t7,80\t7,28\t0,078\t100,00\t1,03\t101,03\t105,61%\t7,750%\tNY\tCCL
+PAN AMERICAN \tPN43O\t15/1/2037\t2037\t$111,20\t6,76%\t6,80\t6,37\t0,071\t100,00\t3,60\t103,60\t107,34%\t7,750%\tNY\tCCL
+VISTA\tVSCXO\t8/4/2038\t2038\t$108,50\t7,10%\t7,45\t6,95\t0,075\t100,00\t1,83\t101,83\t106,55%\t7,875%\tNY\tCCL
+PAMPA\tMGCOO\t16/12/2034\t2034\t$107,50\t6,86%\t6,40\t5,99\t0,064\t100,00\t0,34\t100,34\t107,13%\t7,875%\tNY\tCCL
+PAN AMERICAN \tPNXCO\t30/4/2032\t2032\t$112,20\t6,11%\t4,04\t3,81\t0,043\t100,00\t1,49\t101,49\t110,56%\t8,500%\tNY\tCCL
+PAMPA\tMGCMO\t10/9/2031\t2031\t$111,65\t5,95%\t4,30\t4,06\t0,045\t100,00\t2,46\t102,46\t108,97%\t8,250%\tNY\tCCL
+TGS\tTSC4O\t20/11/2035\t2035\t$107,45\t6,90%\t6,88\t6,43\t0,069\t100,00\t0,91\t100,91\t106,49%\t7,750%\tNY\tCCL
+TECPETROL\tTTCDO\t3/11/2030\t2030\t$107,80\t5,96%\t3,76\t3,55\t0,038\t100,00\t1,24\t101,24\t106,48%\t7,625%\tNY\tCCL
+VISTA\tVSCTO\t10/12/2035\t2035\t$107,10\t6,69%\t6,43\t6,02\t0,065\t100,00\t0,46\t100,46\t106,61%\t7,625%\tNY\tCCL
+PAMPA\tMGCQO\t6/8/2028\t2028\t$108,85\t4,29%\t1,94\t1,86\t0,020\t100,00\t2,90\t102,90\t105,78%\t7,250%\tARG\tCCL
+YPF\tYMCJO\t30/9/2033\t2033\t$107,10\t5,97%\t4,76\t4,49\t0,048\t100,00\t1,79\t101,79\t105,22%\t7,000%\tNY\tCCL`;
+
+        document.getElementById('dataInput').value = sampleData.trim();
+
+        // Register Chart.js DataLabels plugin
+        Chart.register(ChartDataLabels);
+
+        // Bind events
+        document.getElementById('calcBtn').addEventListener('click', calculateAnalysis);
+        document.getElementById('searchInput').addEventListener('input', renderTable);
+        document.getElementById('zoomBondsCheck').addEventListener('change', handleZoomToggle);
+        document.getElementById('applyAxisBtn').addEventListener('click', applyManualAxes);
+
+        function setupAxisDefaults(bonds) {
+            const durations = bonds.map(b => b.duration);
+            const yields = bonds.map(b => b.yield);
+            
+            const minDur = Math.min(...durations);
+            const maxDur = Math.max(...durations);
+            const minYield = Math.min(...yields);
+            const maxYield = Math.max(...yields);
+            
+            // Set defaults in the input boxes
+            document.getElementById('xMinInput').value = Math.max(0, Math.floor(minDur - 0.5));
+            document.getElementById('xMaxInput').value = Math.ceil(maxDur + 0.5);
+            document.getElementById('yMinInput').value = Math.max(0, Math.floor(minYield - 1.0));
+            document.getElementById('yMaxInput').value = Math.ceil(maxYield + 1.0);
+            
+            const isZoomed = document.getElementById('zoomBondsCheck').checked;
+            toggleAxisInputs(!isZoomed);
+        }
+
+        function toggleAxisInputs(enable) {
+            document.getElementById('xMinInput').disabled = !enable;
+            document.getElementById('xMaxInput').disabled = !enable;
+        }
+
+        function handleZoomToggle() {
+            const isZoomed = document.getElementById('zoomBondsCheck').checked;
+            toggleAxisInputs(!isZoomed);
+            
+            if (chartInstance) {
+                if (isZoomed) {
+                    const minDur = parseFloat(document.getElementById('xMinInput').value);
+                    const maxDur = parseFloat(document.getElementById('xMaxInput').value);
+                    chartInstance.options.scales.x.min = minDur;
+                    chartInstance.options.scales.x.max = maxDur;
+                } else {
+                    chartInstance.options.scales.x.min = 0;
+                    chartInstance.options.scales.x.max = null;
+                }
+                chartInstance.update();
+            }
+        }
+
+        function applyManualAxes() {
+            if (!chartInstance) return;
+            
+            const isZoomed = document.getElementById('zoomBondsCheck').checked;
+            
+            const xMin = parseFloat(document.getElementById('xMinInput').value);
+            const xMax = parseFloat(document.getElementById('xMaxInput').value);
+            const yMin = parseFloat(document.getElementById('yMinInput').value);
+            const yMax = parseFloat(document.getElementById('yMaxInput').value);
+            
+            if (!isZoomed && !isNaN(xMin)) chartInstance.options.scales.x.min = xMin;
+            if (!isZoomed && !isNaN(xMax)) chartInstance.options.scales.x.max = xMax;
+            if (isZoomed) {
+                chartInstance.options.scales.x.min = parseFloat(document.getElementById('xMinInput').value);
+                chartInstance.options.scales.x.max = parseFloat(document.getElementById('xMaxInput').value);
+            }
+            
+            chartInstance.options.scales.y.min = isNaN(yMin) ? null : yMin;
+            chartInstance.options.scales.y.max = isNaN(yMax) ? null : yMax;
+            
+            chartInstance.update();
+        }
+
+        // Sorting event handlers
+        document.querySelectorAll('#bondsTable th').forEach(th => {
+            th.addEventListener('click', () => {
+                const key = th.getAttribute('data-key');
+                if (sortKey === key) {
+                    sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+                } else {
+                    sortKey = key;
+                    sortDirection = 'desc';
+                }
+                updateSortHeaders();
+                renderTable();
+            });
+        });
+
+        function updateSortHeaders() {
+            document.querySelectorAll('#bondsTable th').forEach(th => {
+                th.classList.remove('sort-asc', 'sort-desc');
+                if (th.getAttribute('data-key') === sortKey) {
+                    th.classList.add(sortDirection === 'asc' ? 'sort-asc' : 'sort-desc');
+                }
+            });
+        }
+
+        // Color mapping for Z-scores
+        function getZColor(z) {
+            if (z > 1.5) return '#10b981'; // BUY
+            if (z > 0.5) return '#34d399'; // Slightly Buy
+            if (z < -1.5) return '#ef4444'; // SELL
+            if (z < -0.5) return '#f87171'; // Slightly Sell
+            return '#94a3b8'; // Neutral
+        }
+
+        async function calculateAnalysis() {
+            const rawData = document.getElementById('dataInput').value;
+            const btn = document.getElementById('calcBtn');
+            const errAlert = document.getElementById('errorAlert');
+
+            errAlert.style.display = 'none';
+            btn.classList.add('btn-loading');
+            btn.textContent = 'Analizando y Calibrando...';
+
+            try {
+                const response = await fetch('/api/analyze', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ data: rawData })
+                });
+
+                const result = await response.json();
+
+                if (!result.success) {
+                    errAlert.textContent = result.error;
+                    errAlert.style.display = 'block';
+                    return;
+                }
+
+                bondsData = result.bonds;
+                expandedRows.clear();
+
+                // Show panels
+                document.getElementById('paramsCard').style.display = 'flex';
+                document.getElementById('chartControls').style.display = 'flex';
+                document.getElementById('chartPlaceholder').style.display = 'none';
+                document.getElementById('chartWrapper').style.display = 'block';
+                document.getElementById('tablePlaceholder').style.display = 'none';
+                document.getElementById('tableContainer').style.display = 'block';
+
+                // Render parameters
+                document.getElementById('valBeta0').textContent = result.parameters.beta0.toFixed(4) + '%';
+                document.getElementById('valBeta1').textContent = result.parameters.beta1.toFixed(4) + '%';
+                document.getElementById('valBeta2').textContent = result.parameters.beta2.toFixed(4) + '%';
+                document.getElementById('valLambda').textContent = result.parameters.lambda.toFixed(4);
+                document.getElementById('valRmse').textContent = result.rmse.toFixed(4) + '%';
+
+                // Setup Axis Inputs with Auto Defaults
+                setupAxisDefaults(result.bonds);
+
+                // Render components
+                renderChart(result.curve, result.bonds);
+                updateSortHeaders();
+                renderTable();
+
+            } catch (err) {
+                errAlert.textContent = 'Error de conexión con el backend: ' + err.message;
+                errAlert.style.display = 'block';
+            } finally {
+                btn.classList.remove('btn-loading');
+                btn.textContent = 'Calcular Parámetros & Z-Score';
+            }
+        }
+
+        function renderChart(curveData, bonds) {
+            const ctx = document.getElementById('yieldChart').getContext('2d');
+            
+            // Build datasets
+            const curvePoints = curveData.map(pt => ({ x: pt.x, y: pt.y }));
+            const bondPoints = bonds.map(b => ({
+                x: b.duration,
+                y: b.yield,
+                ticker: b.ticker,
+                fitted: b.fitted,
+                zScore: b.z_score,
+                signal: b.signal,
+                res: b.residual_bps
+            }));
+
+            const isZoomed = document.getElementById('zoomBondsCheck').checked;
+            const xMin = isZoomed ? parseFloat(document.getElementById('xMinInput').value) : 0;
+            const xMax = isZoomed ? parseFloat(document.getElementById('xMaxInput').value) : null;
+            const yMin = parseFloat(document.getElementById('yMinInput').value);
+            const yMax = parseFloat(document.getElementById('yMaxInput').value);
+
+            if (chartInstance) {
+                chartInstance.destroy();
+            }
+
+            chartInstance = new Chart(ctx, {
+                type: 'scatter',
+                data: {
+                    datasets: [
+                        {
+                            label: 'Curva Nelson-Siegel',
+                            data: curvePoints,
+                            type: 'line',
+                            borderColor: '#3b82f6',
+                            borderWidth: 3,
+                            fill: false,
+                            pointRadius: 0,
+                            showLine: true,
+                            z: 1,
+                            datalabels: {
+                                display: false
+                            }
+                        },
+                        {
+                            label: 'Activos (Scatter)',
+                            data: bondPoints,
+                            pointBackgroundColor: bonds.map(b => getZColor(b.z_score)),
+                            pointBorderColor: '#0b0f19',
+                            pointBorderWidth: 1.5,
+                            pointRadius: 8,
+                            pointHoverRadius: 10,
+                            z: 2,
+                            datalabels: {
+                                display: true,
+                                align: 'top',
+                                color: '#f3f4f6',
+                                font: {
+                                    family: 'Inter',
+                                    weight: 'bold',
+                                    size: 10
+                                },
+                                formatter: function(value) {
+                                    return value.ticker;
+                                },
+                                offset: 4
+                            }
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            labels: {
+                                color: '#f3f4f6',
+                                font: { family: 'Outfit', weight: 'bold' }
+                            }
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(11, 15, 25, 0.95)',
+                            titleColor: '#ffffff',
+                            bodyColor: '#e5e7eb',
+                            borderColor: 'rgba(255, 255, 255, 0.1)',
+                            borderWidth: 1,
+                            callbacks: {
+                                label: function(context) {
+                                    const pt = context.raw;
+                                    if (pt.ticker) {
+                                        return [
+                                            `Bono: ${pt.ticker}`,
+                                            `MDuration: ${pt.x.toFixed(2)} años`,
+                                            `TIR Real: ${pt.y.toFixed(2)}%`,
+                                            `TIR Teórica: ${pt.fitted.toFixed(2)}%`,
+                                            `Residuo: ${pt.res > 0 ? '+' : ''}${pt.res.toFixed(1)} bps`,
+                                            `Z-Score: ${pt.zScore > 0 ? '+' : ''}${pt.zScore.toFixed(2)}`,
+                                            `Señal: ${pt.signal}`
+                                        ];
+                                    }
+                                    return `Tasa: ${pt.y.toFixed(2)}% a ${pt.x.toFixed(2)} años`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            type: 'linear',
+                            min: xMin,
+                            max: xMax,
+                            title: {
+                                display: true,
+                                text: 'Modified Duration (años)',
+                                color: '#9ca3af',
+                                font: { size: 12, weight: 'bold' }
+                            },
+                            grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                            ticks: { color: '#9ca3af' }
+                        },
+                        y: {
+                            min: isNaN(yMin) ? null : yMin,
+                            max: isNaN(yMax) ? null : yMax,
+                            title: {
+                                display: true,
+                                text: 'Yield / TIR (TEA %)',
+                                color: '#9ca3af',
+                                font: { size: 12, weight: 'bold' }
+                            },
+                            grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                            ticks: { color: '#9ca3af' }
+                        }
+                    }
+                }
+            });
+        }
+
+        function toggleRow(ticker) {
+            if (expandedRows.has(ticker)) {
+                expandedRows.delete(ticker);
+            } else {
+                expandedRows.add(ticker);
+            }
+            renderTable();
+        }
+
+        function renderTable() {
+            const tbody = document.getElementById('tableBody');
+            const search = document.getElementById('searchInput').value.toLowerCase();
+            tbody.innerHTML = '';
+
+            // Filter data
+            let filtered = bondsData.filter(b => {
+                const matchesTicker = b.ticker.toLowerCase().includes(search);
+                const matchesDetails = Object.values(b.details).some(val => val.toLowerCase().includes(search));
+                return matchesTicker || matchesDetails;
+            });
+
+            // Sort data
+            filtered.sort((a, b) => {
+                let valA = a[sortKey];
+                let valB = b[sortKey];
+
+                if (sortKey === 'ticker' || sortKey === 'signal') {
+                    return sortDirection === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
+                } else {
+                    return sortDirection === 'asc' ? valA - valB : valB - valA;
+                }
+            });
+
+            document.getElementById('bondCount').textContent = `${filtered.length} activos encontrados`;
+
+            if (filtered.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--text-secondary); padding: 2rem;">No se encontraron activos</td></tr>`;
+                return;
+            }
+
+            filtered.forEach(b => {
+                const tr = document.createElement('tr');
+                tr.onclick = () => toggleRow(b.ticker);
+
+                let signalClass = 'pill-neutral';
+                if (b.signal.includes('BUY')) signalClass = 'pill-buy';
+                else if (b.signal.includes('SELL')) signalClass = 'pill-sell';
+
+                tr.innerHTML = `
+                    <td style="font-weight: 600;">${b.ticker}</td>
+                    <td>${b.duration.toFixed(2)}</td>
+                    <td>${b.yield.toFixed(2)}%</td>
+                    <td>${b.fitted.toFixed(2)}%</td>
+                    <td style="font-weight: 500; color: ${b.residual_bps > 0 ? 'var(--buy-color)' : 'var(--sell-color)'}">
+                        ${b.residual_bps > 0 ? '+' : ''}${b.residual_bps.toFixed(1)} bps
+                    </td>
+                    <td style="font-weight: 500;">${b.z_score > 0 ? '+' : ''}${b.z_score.toFixed(2)}</td>
+                    <td><span class="pill ${signalClass}">${b.signal}</span></td>
+                `;
+                tbody.appendChild(tr);
+
+                // Expanded row details
+                if (expandedRows.has(b.ticker)) {
+                    const detTr = document.createElement('tr');
+                    detTr.className = 'details-row';
+                    
+                    let detailsHTML = `<div class="details-grid">`;
+                    // Loop details
+                    for (const [key, value] of Object.entries(b.details)) {
+                        detailsHTML += `
+                            <div class="details-item">
+                                <div class="details-label">${key}</div>
+                                <div class="details-val">${value}</div>
+                            </div>
+                        `;
+                    }
+                    detailsHTML += `</div>`;
+
+                    detTr.innerHTML = `<td colspan="7">${detailsHTML}</td>`;
+                    tbody.appendChild(detTr);
+                }
+            });
+        }
+    </script>
+</body>
+</html>

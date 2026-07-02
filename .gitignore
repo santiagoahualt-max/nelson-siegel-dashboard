@@ -1,0 +1,19 @@
+# Caches
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Environments
+.venv/
+venv/
+ENV/
+env/
+
+# Local input / output data (so they don't pollute the git repo)
+input_data.txt
+output_data.csv
+nelson_siegel_curve.png
+
+# OS files
+.DS_Store
+Thumbs.db
